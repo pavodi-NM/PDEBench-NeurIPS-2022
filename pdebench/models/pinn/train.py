@@ -196,6 +196,9 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
                 if_periodic_bc=True,
                 aux_params=[0.1]):
 
+    print(f"setting up pde 1D")
+    #sys.exit()
+    
     # TODO: read from dataset config file
     geom = dde.geometry.Interval(xL, xR)
     boundary_r = lambda x, on_boundary: _boundary_r(x, on_boundary, xL, xR)
@@ -215,8 +218,11 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
     geomtime = dde.geometry.GeometryXTime(geom, timedomain)
 
     dataset = PINNDataset1Dpde(filename, root_path=root_path, val_batch_idx=val_batch_idx)
+    print(f"Data set loaded successfully: {dataset}")
+    #sys.exit()
     # prepare initial condition
     initial_input, initial_u = dataset.get_initial_condition()
+    print(f"initial input: {initial_input.shape}, initial_u: {initial_u.shape}")
     if filename.split('_')[1][0] == 'C':
         ic_data_d = dde.icbc.PointSetBC(initial_input.cpu(), initial_u[:,0].unsqueeze(1), component=0)
         ic_data_v = dde.icbc.PointSetBC(initial_input.cpu(), initial_u[:,1].unsqueeze(1), component=1)
@@ -226,6 +232,7 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
     # prepare boundary condition
     if if_periodic_bc:
         if filename.split('_')[1][0] == 'C':
+            print(f"in C")
             bc_D = dde.icbc.PeriodicBC(geomtime, 0, boundary_r)
             bc_V = dde.icbc.PeriodicBC(geomtime, 1, boundary_r)
             bc_P = dde.icbc.PeriodicBC(geomtime, 2, boundary_r)
@@ -239,6 +246,7 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
                 num_initial=5000,
             )
         else:
+            print(f"in BC")
             bc = dde.icbc.PeriodicBC(geomtime, 0, boundary_r)
             data = dde.data.TimePDE(
                 geomtime,
@@ -255,7 +263,7 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
         bd_input, bd_uL, bd_uR = dataset.get_boundary_condition()
         bc_data_uL = dde.icbc.PointSetBC(bd_input.cpu(), bd_uL, component=0)
         bc_data_uR = dde.icbc.PointSetBC(bd_input.cpu(), bd_uR, component=0)
-
+        print(f"boundary input: {bd_input.shape}")
         data = dde.data.TimePDE(
             geomtime,
             pde,
@@ -264,6 +272,9 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
             num_boundary=1000,
             num_initial=5000,
         )
+    
+    print(f"Data: {data}, pde: {pde}")
+    sys.exit()
     net = dde.nn.FNN([input_ch] + [hidden_ch] * 6 + [output_ch], "tanh", "Glorot normal")
     model = dde.Model(data, net)
 
@@ -458,6 +469,10 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
 def run_training(scenario, epochs, learning_rate, model_update, flnm,
                  input_ch=1, output_ch=1,
                  root_path='../data/', val_num=10, if_periodic_bc=True, aux_params=[None], seed='0000'):
+    print(val_num, scenario)
+    root_path =  "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
+    
+    #sys.exit()
 
     if val_num == 1:  # single job
         _run_training(scenario, epochs, learning_rate, model_update, flnm,

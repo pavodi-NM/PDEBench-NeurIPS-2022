@@ -1,5 +1,5 @@
 model_name: 'Unet'
-if_training: True
+if_training: False # False will use  pre-trained model. True will train
 continue_training: False
 batch_size: 50
 t_train: 200
@@ -10,18 +10,18 @@ reduced_resolution: 4
 reduced_resolution_t: 5
 reduced_batch: 1
 epochs: 500
-learning_rate: 1.e-3
+learning_rate: 1.e-3  
 num_workers: 0
 #Unet
 in_channels: 1
 out_channels: 1
-ar_mode: True
-pushforward: True
-unroll_step: 20
+ar_mode: True   # True if autoregressive mode or pushforward training is used.
+pushforward: True # Must be True if using pushforward training
+unroll_step: 20 # Number of time steps to backpropagate in the pushforward training.
 #FNO
 num_channels: 1
 modes: 12
 width: 20
 scheduler_step: 100
 scheduler_gamma: 0.5
-initial_step: 10
+initial_step: 10 

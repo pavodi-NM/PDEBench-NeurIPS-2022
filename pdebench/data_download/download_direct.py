@@ -71,7 +71,7 @@ def download_data(root_folder, pde_name):
     print(f"Downloading data for {pde_name} ...")
 
     # Load and parse metadata csv file
-    pde_df = parse_metadata(pde_name)
+    pde_df = parse_metadata(pde_name) 
 
     # Iterate filtered dataframe and download the files
     for index, row in tqdm(pde_df.iterrows(), total=pde_df.shape[0]):
@@ -101,3 +101,8 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
 
     download_data(args.root_folder, args.pde_name)
+
+
+
+""" This is how you download data for training and evaluation """
+# python download_direct.py --root_folder $proj_home/data --pde_name 1d_reacdiff

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import os 
 import torch
 import numpy as np
 import pickle
@@ -11,8 +12,8 @@ import operator
 from functools import reduce
 from functools import partial
 
-from timeit import default_timer
-
+from timeit import default_timer 
+ 
 # torch.manual_seed(0)
 # np.random.seed(0)
 
@@ -28,7 +29,7 @@ def run_training(if_training,
                  initial_step,
                  t_train,
                  in_channels,
-                 out_channels,
+                 out_channels, 
                  batch_size,
                  unroll_step,
                  ar_mode,
@@ -61,19 +62,22 @@ def run_training(if_training,
     # load data
     ################################################################
     
-    if single_file:
+    if single_file: 
+        # Load data from my own path
+        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
+        pre_trained_base_me = "../PDEBench/pdebench/models/pre-trained-models/unet/"
         # filename
         model_name = flnm[:-5] + '_Unet'
     
         # Initialize the dataset and dataloader
         train_data = UNetDatasetSingle(flnm,
-                                saved_folder=base_path,
+                                saved_folder= base_path_me, #base_path,
                                 reduced_resolution=reduced_resolution,
                                 reduced_resolution_t=reduced_resolution_t,
                                 reduced_batch=reduced_batch,
                                 initial_step=initial_step)
         val_data = UNetDatasetSingle(flnm,
-                              saved_folder=base_path,
+                              saved_folder=base_path_me, #base_path,
                               reduced_resolution=reduced_resolution,
                               reduced_resolution_t=reduced_resolution_t,
                               reduced_batch=reduced_batch,
@@ -91,7 +95,7 @@ def run_training(if_training,
                                 saved_folder=base_path)
         val_data = UNetDatasetMult(flnm,
                               reduced_resolution=reduced_resolution,
-                              reduced_resolution_t=reduced_resolution_t,
+                              reduced_resolution_t=reduced_resolution_t, 
                               reduced_batch=reduced_batch,
                               if_test=True,
                               saved_folder=base_path)
@@ -99,7 +103,9 @@ def run_training(if_training,
     train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
                                                num_workers=num_workers, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
-                                             num_workers=num_workers, shuffle=False)    
+                                             num_workers=num_workers, shuffle=False)   
+    
+    print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}")
     
     ################################################################
     # training and evaluation
@@ -111,7 +117,7 @@ def run_training(if_training,
     print('Spatial Dimension', dimensions - 3)
     if training_type in ['autoregressive']:
         if dimensions == 4:
-            model = UNet1d(in_channels*initial_step, out_channels).to(device)
+            model = UNet1d(in_channels*initial_step, out_channels).to(device) # U-Net receives the feature + the initial step values
         elif dimensions == 5:
             model = UNet2d(in_channels*initial_step, out_channels).to(device)
         elif dimensions == 6:
@@ -141,10 +147,23 @@ def run_training(if_training,
         else:
             model_name = model_name + '-1-step'
         
-    model_path = model_name + ".pt"
+    model_path = pre_trained_base_me + model_name + ".pt"
+    pre_trained_model = os.path.abspath(model_path)
+    
+    if not os.path.exists(pre_trained_base_me):
+        print("The Path Does not Exist, creating the path for the model training...")
+        os.makedirs(pre_trained_base_me, exist_ok=True)
+    else:
+        print("The Path Exists")
+        
+    
+    #sys.exit()
     
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'Total parameters = {total_params}')
+    #print(f'if training value: {if_training}, continue training value: {continue_training}, initial step value: {initial_step}, t_train value: {t_train}, unroll step value: {unroll_step}, ar_mode value: {ar_mode}, pushforward value: {pushforward}, scheduler step value: {scheduler_step}, scheduler gamma value: {scheduler_gamma}, model update value: {model_update}, flnm value: {flnm}, single_file value: {single_file}, reduced_resolution value: {reduced_resolution}, reduced_resolution_t value: {reduced_resolution_t}, reduced_batch value: {reduced_batch}, plot value: {plot}, channel_plot value: {channel_plot}, x_min value: {x_min}, x_max value: {x_max}, y_min value: {y_min}, y_max value: {y_max}, t_min value: {t_min}, t_max value: {t_max}, base_path value: {base_path}, training_type value: {training_type}')
+    print(f'plot value: {plot}, batch size value: {batch_size}')
+    #sys.exit()  # counting the number of parameters.
     
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
@@ -153,20 +172,27 @@ def run_training(if_training,
     loss_val_min = np.infty
     
     start_epoch = 0
-
+    # print(f"if training value: {if_training}")
+    # sys.exit()
+    
     if not if_training:
         checkpoint = torch.load(model_path, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device)
         model.eval()
+        print(f"The Pre-Trained model")
+        print(model)
+        print(f"Initial step: {initial_step}") # The UNet-1D takes 10 as the initial step but my appraoch takes 1 as initial step. 
+        #sys.exit()
         Lx, Ly, Lz = 1., 1., 1.
-        errs = metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot,
+        errs = metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, 
                        model_name, x_min, x_max, y_min, y_max,
                        t_min, t_max, mode='Unet', initial_step=initial_step)
         pickle.dump(errs, open(model_name+'.pickle', "wb"))
             
         return
 
+   
     # If desired, restore the network by loading the weights saved in the .pt
     # file
     if continue_training:
@@ -187,9 +213,13 @@ def run_training(if_training,
         loss_val_min = checkpoint['loss']
 
     print('start training...')
-    
+    print(f"This is the value of ar_mode : {ar_mode}")
+    # change training type to single
+    #training_type = "single"
+    #sys.exit()
     if ar_mode:
-    
+        #print(f"This is the the autoregressive mode or pushforward training and training type is : {training_type}") # autoregressive
+        #sys.exit()
         for ep in range(start_epoch, epochs):
             model.train()
             t1 = default_timer()
@@ -205,60 +235,79 @@ def run_training(if_training,
                 xx = xx.to(device)
                 yy = yy.to(device)
                 
+                #print(f"shape of xx: {xx.shape} and shape of yy: {yy.shape}") #  torch.Size([50, 256, 10, 1])  and  torch.Size([50, 256, 41, 1])
+
+                
                 if training_type in ['autoregressive']:
 
                     # Initialize the prediction tensor
-                    pred = yy[..., :initial_step, :]
+                    pred = yy[..., :initial_step, :] # it takes 10 different different time steps. 
+                    # print(f"initialized prediction variable shape: {pred.shape}") # torch.Size([50, 256, 10, 1])
+                    # sys.exit()
                     
                     # Extract shape of the input tensor for reshaping (i.e. stacking the
                     # time and channels dimension together)
                     inp_shape = list(xx.shape)
                     inp_shape = inp_shape[:-2]
                     inp_shape.append(-1)
+                    #print(f"This is the input_shape variable : {inp_shape}") #  [50, 256, -1]
+                    #sys.exit()
             
                     # Autoregressive loop
-                    for t in range(initial_step, t_train):
-                        
-                        if t < t_train-unroll_step:
-                            with torch.no_grad():
+                    for t in range(initial_step, t_train): # initial step 10, t_train = 41,
+                        #print(f"initial t value: {t}, t_train: {t_train}, unroll steps: {unroll_step}") # initial t value: 10, t_train: 41, unroll steps: 20
+                        #sys.exit()
+                        if t < t_train-unroll_step: # if t = 10 < 41 - 20 
+                            with torch.no_grad(): # The reason we have this is because it is using Truncating Backpropagation Through Time (TBTT) to save computation and memory 
                                 # Reshape input tensor into [b, x1, ..., xd, t_init*v]
                                 inp = xx.reshape(inp_shape)
                                 temp_shape = [0, -1]
                                 temp_shape.extend([i for i in range(1,len(inp.shape)-1)])
-                                inp = inp.permute(temp_shape)
+                                #print(f"inp shape before permutation: {inp.shape}, temp variable used for permutation shape: {temp_shape}") # inp : torch.Size([50, 256, 10]), temp_shape : [0, -1, 1], [50, 10, 256]
+                                inp = inp.permute(temp_shape) # U-net takes as input a matrix  but outputs a single value. 
+                                #print(f"inp shape after permutting with temp_shape: {inp.shape}") # torch.Size([50, 10, 256])
                                 
                                 # Extract target at current time step
                                 y = yy[..., t:t+1, :]
+                                #print(f"y at the current time step shape: {y.shape}") #  # torch.Size([50, 256, 1, 1])
+        
                         
                                 # Model run
                                 temp_shape = [0]
                                 temp_shape.extend([i for i in range(2,len(inp.shape))])
                                 temp_shape.append(1)
+                                #print(f"inp shape before permutation: {inp.shape}, temp variable used for permutation shape: {temp_shape}") #  input: torch.Size([50, 10, 256]), temp_shape: [0, 2, 1]
+                                temp_output_ = model(inp) 
+                                #print(f"shape of temp model output: {temp_output_.shape}") # shape of temp model output: torch.Size([50, 1, 256])
                                 im = model(inp).permute(temp_shape).unsqueeze(-2)
+                                #print(f"the shape of the model output: {im.shape}") # im shape:  torch.Size([50, 256, 1, 1])
+                               
                                 
                                 # Concatenate the prediction at current time step into the
                                 # prediction tensor
-                                pred = torch.cat((pred, im), -2)
+                                pred = torch.cat((pred, im), -2) # pred shape: torch.Size([50, 256, 10, 1]), im shape:  torch.Size([50, 256, 1, 1])
+                                #print(f"pred shape after concatenating pred and model's output along -2 dimension: {pred.shape}") # pred shape: torch.Size([50, 256, 11, 1])
                     
                                 # Concatenate the prediction at the current time step to be used
                                 # as input for the next time step
                                 xx = torch.cat((xx[..., 1:, :], im), dim=-2)
-                        
+                                #print(f"xx shape as the next input: {xx.shape}") # xx shape:  torch.Size([50, 256, 10, 1])
+                                #sys.exit()
                         else:
                             # Reshape input tensor into [b, x1, ..., xd, t_init*v]
                             inp = xx.reshape(inp_shape)
                             temp_shape = [0, -1]
                             temp_shape.extend([i for i in range(1,len(inp.shape)-1)])
-                            inp = inp.permute(temp_shape)
+                            inp = inp.permute(temp_shape) # input: torch.Size([50, 10, 256]),
                             
                             # Extract target at current time step
-                            y = yy[..., t:t+1, :]
+                            y = yy[..., t:t+1, :] #  # torch.Size([50, 256, 1, 1])
                         
                             # Model run
                             temp_shape = [0]
                             temp_shape.extend([i for i in range(2,len(inp.shape))])
                             temp_shape.append(1)
-                            im = model(inp).permute(temp_shape).unsqueeze(-2)
+                            im = model(inp).permute(temp_shape).unsqueeze(-2) # torch.Size([50, 256, 1, 1])
                             
                             # Loss calculation
                             loss += loss_fn(im.reshape(batch_size, -1), y.reshape(batch_size, -1))
@@ -274,6 +323,8 @@ def run_training(if_training,
                     train_l2_step += loss.item()
                     _batch = yy.size(0)
                     _yy = yy[..., :t_train, :]
+                    #print(f"pred shape: {pred.shape}, _yy shape: {_yy.shape}")
+                    #sys.exit()
                     l2_full = loss_fn(pred.reshape(_batch, -1), _yy.reshape(_batch, -1))
                     train_l2_full += l2_full.item()
             
@@ -282,8 +333,11 @@ def run_training(if_training,
                     optimizer.step()
 
             if training_type in ['single']:
+                print("Single training type being used...")
                 x = xx[..., 0 , :]
                 y = yy[..., t_train-1:t_train, :]
+                #print(f"xx: {xx.shape}, x: {x.shape}, yy: {yy.shape}, y: {y.shape} ") # xx: torch.Size([50, 256, 10, 1]), x: torch.Size([50, 256, 1]), yy: torch.Size([50, 256, 41, 1]), y: torch.Size([50, 256, 1, 1]) 
+                #sys.exit()
                 pred = model(x.permute([0, 2, 1])).permute([0, 2, 1])
                 _batch = yy.size(0)
                 loss += loss_fn(pred.reshape(_batch, -1), y.reshape(_batch, -1))
@@ -331,11 +385,15 @@ def run_training(if_training,
                             _batch = yy.size(0)
                             _pred = pred[..., initial_step:t_train, :]
                             _yy = yy[..., initial_step:t_train, :]
+                            #print(f"pred shape: {pred.shape}, _yy shape: {_yy.shape}")
+                            #sys.exit()
                             val_l2_full += loss_fn(_pred.reshape(_batch, -1), _yy.reshape(_batch, -1)).item()
                     
                     if training_type in ['single']:
                         x = xx[..., 0 , :]
                         y = yy[..., t_train-1:t_train, :]
+                        #print(f"x : {x.shape}, y : {y.shape}")
+                        #sys.exit()
                         pred = model(x.permute([0, 2, 1])).permute([0, 2, 1])
                         _batch = yy.size(0)
                         loss += loss_fn(pred.reshape(_batch, -1), y.reshape(_batch, -1))
@@ -353,6 +411,8 @@ def run_training(if_training,
                             }, model_path)
      
             t2 = default_timer()
+            #print("Done, Success")
+            #sys.exit()
             scheduler.step()
             print('epoch: {0}, loss: {1:.5f}, t2-t1: {2:.5f}, trainL2: {3:.5f}, testL2: {4:.5f}'\
                     .format(ep, loss.item(), t2 - t1, train_l2_step, val_l2_step))
@@ -473,5 +533,5 @@ def run_training(if_training,
 
 if __name__ == "__main__":
     
-    run_training()
+    run_training()  
     print("Done.")

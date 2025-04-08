@@ -149,6 +149,7 @@ arrangements between the parties relating hereto.
 """
 
 import torch
+import sys 
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import os
@@ -178,6 +179,13 @@ class UNetDatasetSingle(Dataset):
         
         # Define path to files
         root_path = os.path.abspath(saved_folder + filename)
+        # print(f"The root path: {root_path}")
+        # if not os.path.exists(root_path):
+        #     print("Does not exist")
+        # else:
+        #     print("Exists")
+        # sys.exit()
+        
         assert filename[-2:] != 'h5', 'HDF5 data is assumed!!'
         
         with h5py.File(root_path, 'r') as f:

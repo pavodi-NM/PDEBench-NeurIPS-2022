@@ -1,4 +1,5 @@
 import sys
+import os 
 import torch
 import numpy as np
 import pickle
@@ -58,6 +59,9 @@ def run_training(if_training,
     ################################################################
     
     if single_file:
+        # Load data from my own path
+        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
+        pre_trained_base_me = "../PDEBench/pdebench/models/pre-trained-models/fno/"
         # filename
         model_name = flnm[:-5] + '_FNO'
         print("FNODatasetSingle")
@@ -68,7 +72,7 @@ def run_training(if_training,
                                 reduced_resolution_t=reduced_resolution_t,
                                 reduced_batch=reduced_batch,
                                 initial_step=initial_step,
-                                saved_folder = base_path
+                                saved_folder = base_path_me
                                 )
         val_data = FNODatasetSingle(flnm,
                               reduced_resolution=reduced_resolution,
@@ -76,7 +80,7 @@ def run_training(if_training,
                               reduced_batch=reduced_batch,
                               initial_step=initial_step,
                               if_test=True,
-                              saved_folder = base_path
+                              saved_folder = base_path_me
                               )
         
     else:
@@ -101,6 +105,8 @@ def run_training(if_training,
                                                num_workers=num_workers, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
                                              num_workers=num_workers, shuffle=False)
+    
+    print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}")
     
     ################################################################
     # training and evaluation
@@ -132,10 +138,19 @@ def run_training(if_training,
     if t_train > _data.shape[-2]:
         t_train = _data.shape[-2]
 
-    model_path = model_name + ".pt"
+    model_path = pre_trained_base_me + model_name + ".pt"
+    pre_trained_model = os.path.abspath(model_path) 
     
+    # if not os.path.exists(pre_trained_model):
+    #     print("The Path Does not Exist")
+    # else:
+    #     print("The Path Exists")
+    
+    # sys.exit()
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'Total parameters = {total_params}')
+    print(f'plot value: {plot}, batch size value: {batch_size}, if_training value: {if_training}, continue_training value: {continue_training}, initial_step value: {initial_step}')
+    #sys.exit()
     
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
@@ -160,6 +175,7 @@ def run_training(if_training,
 
     # If desired, restore the network by loading the weights saved in the .pt
     # file
+
     if continue_training:
         print('Restoring model (that is the network\'s weights) from file...')
         checkpoint = torch.load(model_path, map_location=device)
@@ -176,6 +192,8 @@ def run_training(if_training,
                     
         start_epoch = checkpoint['epoch']
         loss_val_min = checkpoint['loss']
+        
+    print("Training a new FNO model...")
     
     for ep in range(start_epoch, epochs):
         model.train()

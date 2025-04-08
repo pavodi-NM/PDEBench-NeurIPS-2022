@@ -1,4 +1,3 @@
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -179,3 +178,27 @@ debug/
 # neural net, sciml artefacts
 .pt
 .hdf5
+
+pdebench/models/pre-trained-models/
+
+# Large data and model files (>5MB)
+*.hdf5
+*.h5
+*.pt
+*.pth
+*.ckpt
+*.npz
+*.npy
+*.pickle
+*.pkl
+*.parquet
+*.feather
+*.arrow
+*.tar
+*.tar.gz
+*.zip
+*.csv.gz
+*.mp4
+*.avi
+*.tif
+*.tiff

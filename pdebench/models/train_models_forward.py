@@ -184,7 +184,7 @@ def main(cfg: DictConfig):
             reduced_resolution=cfg.args.reduced_resolution,
             reduced_resolution_t=cfg.args.reduced_resolution_t,
             reduced_batch=cfg.args.reduced_batch,
-            plot=cfg.args.plot,
+            plot= True, #cfg.args.plot,
             channel_plot=cfg.args.channel_plot,
             x_min=cfg.args.x_min,
             x_max=cfg.args.x_max,
@@ -196,8 +196,8 @@ def main(cfg: DictConfig):
     elif cfg.args.model_name == "Unet":
         from pdebench.models.unet.train import run_training as run_training_Unet
         print("Unet")
-        run_training_Unet(
-            if_training=cfg.args.if_training,
+        run_training_Unet( 
+            if_training=cfg.args.if_training, 
             continue_training=cfg.args.continue_training,
             num_workers=cfg.args.num_workers,
             initial_step=cfg.args.initial_step,
@@ -219,7 +219,7 @@ def main(cfg: DictConfig):
             reduced_resolution=cfg.args.reduced_resolution,
             reduced_resolution_t=cfg.args.reduced_resolution_t,
             reduced_batch=cfg.args.reduced_batch,
-            plot=cfg.args.plot,
+            plot= True, #cfg.args.plot,
             channel_plot=cfg.args.channel_plot,
             x_min=cfg.args.x_min,
             x_max=cfg.args.x_max,
@@ -231,20 +231,22 @@ def main(cfg: DictConfig):
     elif cfg.args.model_name == "PINN":
         # not importing globally as DeepXDE changes some global PyTorch settings
         from pdebench.models.pinn.train import run_training as run_training_PINN
+        #print(cfg.args.scenario)
         print("PINN")
+        #sys.exit()
         run_training_PINN(
-            scenario=cfg.args.scenario,
+            scenario= "pde1D",  #cfg.args.scenario,
             epochs=cfg.args.epochs,
             learning_rate=cfg.args.learning_rate,
             model_update=cfg.args.model_update,
             flnm=cfg.args.filename,
-            seed=cfg.args.seed,
-            input_ch=cfg.args.input_ch,
-            output_ch=cfg.args.output_ch,
-            root_path=cfg.args.root_path,
-            val_num=cfg.args.val_num,
-            if_periodic_bc=cfg.args.if_periodic_bc,
-            aux_params=cfg.args.aux_params
+            seed= 22, #cfg.args.seed,
+            input_ch=1 ,#cfg.args.input_ch,
+            output_ch=1, #cfg.args.output_ch,
+            root_path= None, #cfg.args.root_path,
+            val_num=1, #cfg.args.val_num,
+            if_periodic_bc=True, #cfg.args.if_periodic_bc,
+            aux_params=[None], #cfg.args.aux_params
         )
 
 

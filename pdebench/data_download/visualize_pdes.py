@@ -493,4 +493,9 @@ if __name__ == "__main__":
         visualize_1d_reacdiff(args.data_path, args.params)
     else:
         raise ValueError("PDE name not recognized!")
+    
 
+
+# python visualize_pdes.py --pde_name "1d_reacdiff"
+
+# /home/maniamfu/PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/Train

@@ -147,6 +147,7 @@ arrangements between the parties relating hereto.
 """
 
 import torch
+import sys 
 import numpy as np
 import math as mt
 import matplotlib.pyplot as plt
@@ -159,7 +160,8 @@ def metric_func(pred, target, if_mean=True, Lx=1., Ly=1., Lz=1., iLow=4, iHigh=1
     code for calculate metrics discussed in the Brain-storming session
     RMSE, normalized RMSE, max error, RMSE at the boundaries, conserved variables, RMSE in Fourier space, temporal sensitivity
     """
-    pred, target = pred.to(device), target.to(device)
+    pred, target = pred.to(device), target.to(device) # supposed to be: pred: torch.Size([50, 256, 41, 1]), target: torch.Size([50, 256, 41, 1])
+    #print(f"pred: {pred.shape}, target: {target.shape}") # supposed to be: pred: torch.Size([50, 1, 256, 41]), target: torch.Size([50, 1, 256, 41])
     # (batch, nx^i..., timesteps, nc)
     idxs = target.size()
     if len(idxs) == 4:
@@ -174,12 +176,20 @@ def metric_func(pred, target, if_mean=True, Lx=1., Ly=1., Lz=1., iLow=4, iHigh=1
     idxs = target.size()
     nb, nc, nt = idxs[0], idxs[1], idxs[-1]
 
+    #print(f"pred: {pred.shape}, target: {target.shape}")
     # RMSE
+    #sys.exit()
+    
     err_mean = torch.sqrt(torch.mean((pred.view([nb, nc, -1, nt]) - target.view([nb, nc, -1, nt])) ** 2, dim=2))
     err_RMSE = torch.mean(err_mean, axis=0)
     nrm = torch.sqrt(torch.mean(target.view([nb, nc, -1, nt]) ** 2, dim=2))
     err_nRMSE = torch.mean(err_mean / nrm, dim=0)
 
+    # print(f"err_rmse: {err_RMSE}, err_nRMSE: {err_nRMSE}, nrm: {nrm}")
+    # print(f"err_rmse: {err_RMSE.shape}, err_nRMSE: {err_nRMSE.shape}, nrm: {nrm.shape}") # err_rmse: torch.Size([1, 41]), err_nRMSE: torch.Size([1, 41]), nrm: torch.Size([32, 1, 41])
+    # sys.exit() 
+    
+    
     err_CSV = torch.sqrt(torch.mean(
         (torch.sum(pred.view([nb, nc, -1, nt]), dim=2) - torch.sum(target.view([nb, nc, -1, nt]), dim=2)) ** 2,
         dim=0))
@@ -279,7 +289,11 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                 xx = xx.to(device)
                 yy = yy.to(device)
 
+                #print(f"xx shape: {xx.shape}, yy shape: {yy.shape}")
+                #sys.exit()
                 pred = yy[..., :initial_step, :]
+                #print(f"pred shape: {pred.shape}")
+                #sys.exit()
                 inp_shape = list(xx.shape)
                 inp_shape = inp_shape[:-2]
                 inp_shape.append(-1)
@@ -299,15 +313,23 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                     pred = torch.cat((pred, im), -2)
                     xx = torch.cat((xx[..., 1:, :], im), dim=-2)
 
+                #print(f"pred shape: {pred.shape}, yy shape: {yy.shape}")
+                #sys.exit()
                 _err_RMSE, _err_nRMSE, _err_CSV, _err_Max, _err_BD, _err_F \
                     = metric_func(pred, yy, if_mean=True, Lx=Lx, Ly=Ly, Lz=Lz)
 
                 if itot == 0:
                     err_RMSE, err_nRMSE, err_CSV, err_Max, err_BD, err_F \
                         = _err_RMSE, _err_nRMSE, _err_CSV, _err_Max, _err_BD, _err_F
+
+                    
                     pred_plot = pred[:1]
                     target_plot = yy[:1]
                     val_l2_time = torch.zeros(yy.shape[-2]).to(device)
+                    # print(f"The plot, pred shape: {pred.shape}, pred[:1] : {pred_plot.shape}")
+                    # print(f"The plot, pred shape: {yy.shape}, pred[:1] : {target_plot.shape}")
+                    # print(f"Val l2 time: {val_l2_time.shape}")
+                    # sys.exit()
                 else:
                     err_RMSE += _err_RMSE
                     err_nRMSE += _err_nRMSE
@@ -329,6 +351,9 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
             for xx, yy, grid in val_loader:
                 xx = xx.to(device)
                 yy = yy.to(device)
+                
+                # print(f"xx shape: {xx.shape}, yy shape: {yy.shape}")
+                # sys.exit()
                 grid = grid.to(device)
 
                 pred = yy[..., :initial_step, :]

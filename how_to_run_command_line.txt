@@ -1,0 +1,10 @@
+ python -m pdebench.models.train_models_forward +args=config_Bgs.yaml ++args.filename='1D_Burgers_Sols_Nu0.001.hdf5' ++args.model_name='Unet' 
+
+
+ data format (batch_size, spatial, temporal, variable_feature)
+ 
+ 
+ 
+ 
+ 
+ 

@@ -152,6 +152,7 @@ import torch
 from torch.utils.data import Dataset, IterableDataset
 from torch.utils.data import DataLoader
 import os
+import sys 
 import glob
 import h5py
 import numpy as np
@@ -181,6 +182,9 @@ class FNODatasetSingle(Dataset):
         
         # Define path to files
         root_path = os.path.join(os.path.abspath(saved_folder), filename)
+        
+        print(f'the filename is: {filename}')
+        #sys.exit()
         if filename[-2:] != 'h5':
             print(f".HDF5 file extension is assumed hereafter")
         
