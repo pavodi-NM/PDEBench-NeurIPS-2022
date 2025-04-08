@@ -44,3 +44,4 @@ The metrics results are as follows:
 
 
 Training PINN with the same conditions as the original model
+================================================================ 
