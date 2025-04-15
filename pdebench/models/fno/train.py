@@ -49,7 +49,7 @@ def run_training(if_training,
                  t_min,
                  t_max,
                  base_path='../data/',
-                 training_type='autoregressive'
+                 training_type='autoregressive' 
                  ):
 
     print(f'Epochs = {epochs}, learning rate = {learning_rate}, scheduler step = {scheduler_step}, scheduler gamma = {scheduler_gamma}')
@@ -60,7 +60,7 @@ def run_training(if_training,
     
     if single_file:
         # Load data from my own path
-        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
+        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/ReactionDiffusion/Train/" #change either to ReactionDiffusion or Burgers
         pre_trained_base_me = "../PDEBench/pdebench/models/pre-trained-models/fno/"
         # filename
         model_name = flnm[:-5] + '_FNO'
@@ -101,18 +101,23 @@ def run_training(if_training,
                               if_test=True,
                               saved_folder = base_path)
 
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
-                                               num_workers=num_workers, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
-                                             num_workers=num_workers, shuffle=False)
+    # train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
+    #                                            num_workers=num_workers, shuffle=True)
+    # val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
+    #                                          num_workers=num_workers, shuffle=False)
     
-    print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}")
+
+    # t_train should be 21 too,
+
+    train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth")
+    val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth")  
     
+    print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}, filename: {flnm}")
     ################################################################
     # training and evaluation
     ################################################################
     
-    _, _data, _ = next(iter(val_loader))
+    _, _data, _, _ = next(iter(val_loader))
     dimensions = len(_data.shape)
     print('Spatial Dimension', dimensions - 3)
     if dimensions == 4:
@@ -166,6 +171,13 @@ def run_training(if_training,
         model.to(device)
         model.eval()
         Lx, Ly, Lz = 1., 1., 1.
+
+        x_min = 0.
+        x_max = 1.
+        t_min = 0.
+        t_max = 2.
+        # print(f"x_min: {x_min}, x_max: {x_max}, y_min: {y_min}, y_max: {y_max}, t_min: {t_min}, t_max: {t_max}")
+        # sys.exit()
         errs = metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot,
                        model_name, x_min, x_max, y_min, y_max,
                        t_min, t_max, initial_step=initial_step)
@@ -209,6 +221,9 @@ def run_training(if_training,
             xx = xx.to(device)
             yy = yy.to(device)
             grid = grid.to(device)
+            
+            # print(f"xx: {xx.shape}, yy: {yy.shape}, t_train: {t_train}")
+            # sys.exit()
 
             # Initialize the prediction tensor
             pred = yy[..., :initial_step, :]
@@ -329,4 +344,6 @@ if __name__ == "__main__":
     
     run_training()
     print("Done.")
+    
+    # python -m pdebench.models.train_models_forward +args=config_Bgs.yaml ++args.filename='1D_Burgers_Sols_Nu0.01.hdf5' ++args.model_name='FNO' ++args.if_training=Training
 

@@ -1,0 +1,4 @@
+PINN Model: plots/1D_Burgers_Sols_Nu0_PINN
+Viscosity: 0.01
+Domain: x ∈ [0, 1.0], t ∈ [0, 2.0]
+Resolution: 100 x 100

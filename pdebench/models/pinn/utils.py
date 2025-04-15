@@ -89,11 +89,20 @@ class PINNDataset1D(Dataset):
         return raveled_tensor.reshape((1, n_x, n_last_time_steps, n_components))
 
     def generate_plot_input(self, time=1.0):
-        x_space = np.linspace(
-            self.config["sim"]["x_left"],
-            self.config["sim"]["x_right"],
-            self.config["sim"]["xdim"],
-        )
+        # Move tensors to CPU before converting to NumPy
+        if isinstance(self.data_grid_x, torch.Tensor):
+            xL = self.data_grid_x.cpu().numpy()
+        else:
+            xL = self.data_grid_x
+        
+        if isinstance(self.data_grid_t, torch.Tensor):
+            xR = self.data_grid_t.cpu().numpy()
+        else:
+            xR = self.data_grid_t
+        
+        xdim = self.data_grid_x.size(0)
+        
+        x_space = np.linspace(xL, xR, xdim)
         # xx, yy = np.meshgrid(x_space, y_space)
 
         tt = np.ones_like(x_space) * time
@@ -429,9 +438,20 @@ class PINNDataset1Dpde(Dataset):
         return raveled_tensor.reshape((1, n_x, n_last_time_steps, n_components))
 
     def generate_plot_input(self, time=1.0):
-        x_space = np.linspace(self.xL, self.xR, self.xdim)
-        # xx, yy = np.meshgrid(x_space, y_space)
-
+        # Move tensors to CPU before converting to NumPy
+        if isinstance(self.xL, torch.Tensor):
+            xL = self.xL.cpu().numpy()
+        else:
+            xL = self.xL
+        
+        if isinstance(self.xR, torch.Tensor):
+            xR = self.xR.cpu().numpy()
+        else:
+            xR = self.xR
+        
+        xdim = self.xdim
+        
+        x_space = np.linspace(xL, xR, xdim)
         tt = np.ones_like(x_space) * time
         val_input = np.vstack((x_space, tt)).T
         return val_input

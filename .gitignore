@@ -180,6 +180,7 @@ debug/
 .hdf5
 
 pdebench/models/pre-trained-models/
+save_data/
 
 # Large data and model files (>5MB)
 *.hdf5

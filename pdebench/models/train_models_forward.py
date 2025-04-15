@@ -231,22 +231,21 @@ def main(cfg: DictConfig):
     elif cfg.args.model_name == "PINN":
         # not importing globally as DeepXDE changes some global PyTorch settings
         from pdebench.models.pinn.train import run_training as run_training_PINN
-        #print(cfg.args.scenario)
         print("PINN")
-        #sys.exit()
+        print(f"{cfg.args.scenario}")
         run_training_PINN(
-            scenario= "pde1D",  #cfg.args.scenario,
+            scenario=cfg.args.scenario,
             epochs=cfg.args.epochs,
             learning_rate=cfg.args.learning_rate,
             model_update=cfg.args.model_update,
             flnm=cfg.args.filename,
-            seed= 22, #cfg.args.seed,
-            input_ch=1 ,#cfg.args.input_ch,
-            output_ch=1, #cfg.args.output_ch,
-            root_path= None, #cfg.args.root_path,
-            val_num=1, #cfg.args.val_num,
-            if_periodic_bc=True, #cfg.args.if_periodic_bc,
-            aux_params=[None], #cfg.args.aux_params
+            seed=cfg.args.seed if hasattr(cfg.args, 'seed') else '0000',
+            input_ch=cfg.args.input_ch if hasattr(cfg.args, 'input_ch') else 2,
+            output_ch=cfg.args.output_ch if hasattr(cfg.args, 'output_ch') else 1,
+            root_path=cfg.args.root_path if hasattr(cfg.args, 'root_path') else '../data/',
+            val_num=cfg.args.val_num if hasattr(cfg.args, 'val_num') else 1,
+            if_periodic_bc=cfg.args.if_periodic_bc if hasattr(cfg.args, 'if_periodic_bc') else True,
+            aux_params=cfg.args.aux_params if hasattr(cfg.args, 'aux_params') else [0.1],
         )
 
 

@@ -285,7 +285,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
     if mode=='Unet':
         with torch.no_grad():
             itot = 0
-            for xx, yy in val_loader:
+            for xx, yy, _, _ in val_loader:
                 xx = xx.to(device)
                 yy = yy.to(device)
 
@@ -348,7 +348,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
     elif mode=='FNO':
         with torch.no_grad():
             itot = 0
-            for xx, yy, grid in val_loader:
+            for xx, yy, grid, _ in val_loader:
                 xx = xx.to(device)
                 yy = yy.to(device)
                 
@@ -423,7 +423,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
             cax = divider.append_axes("right", size="5%", pad=0.05)
             cbar = fig.colorbar(h, cax=cax)
             cbar.ax.tick_params(labelsize=30)
-            ax.set_title("Prediction", fontsize=30)
+            ax.set_title("FNO", fontsize=30)
             ax.tick_params(axis='x',labelsize=30)
             ax.tick_params(axis='y',labelsize=30)
             ax.set_ylabel("$x$", fontsize=30)

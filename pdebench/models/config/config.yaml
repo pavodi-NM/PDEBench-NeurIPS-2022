@@ -45,11 +45,11 @@ args:
     mcmc_num_chains: 1
     num_samples_max: 1000
     in_channels_hid: 64
-    inverse_model_type: InitialConditionInterp    
+    inverse_model_type: InitialConditionInterp       
     #Inverse grad
     inverse_epochs: 100
     inverse_learning_rate: 0.2
-    inverse_verbose_flag: False
+    inverse_verbose_flag: False 
     #Plotting
     plot: True # True will plot the prediction and target. False will not plot.
     channel_plot: 0 # Which channel/variable to be plotted

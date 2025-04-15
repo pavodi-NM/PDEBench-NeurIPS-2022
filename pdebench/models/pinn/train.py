@@ -211,7 +211,10 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
             pde = lambda x, y: pde_adv1d(x, y, aux_params[0])
         elif filename.split('_')[1][0] == 'B':
             timedomain = dde.geometry.TimeDomain(0, 2.0)
-            pde = lambda x, y: pde_burgers1D(x, y, aux_params[0])
+            # Debug the viscosity parameter
+            nu_value = float(aux_params[0]) if aux_params[0] is not None else 0.001
+            print(f"Using viscosity parameter: {nu_value} (from {aux_params[0]})")
+            pde = lambda x, y: pde_burgers1D(x, y, nu_value)
         elif filename.split('_')[1][0]=='C':
             timedomain = dde.geometry.TimeDomain(0, 1.0)
             pde = lambda x, y: pde_CFD1d(x, y, aux_params[0])
@@ -222,7 +225,7 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
     #sys.exit()
     # prepare initial condition
     initial_input, initial_u = dataset.get_initial_condition()
-    print(f"initial input: {initial_input.shape}, initial_u: {initial_u.shape}")
+    #print(f"initial input: {initial_input.shape}, initial_u: {initial_u.shape}")
     if filename.split('_')[1][0] == 'C':
         ic_data_d = dde.icbc.PointSetBC(initial_input.cpu(), initial_u[:,0].unsqueeze(1), component=0)
         ic_data_v = dde.icbc.PointSetBC(initial_input.cpu(), initial_u[:,1].unsqueeze(1), component=1)
@@ -274,8 +277,21 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
         )
     
     print(f"Data: {data}, pde: {pde}")
-    sys.exit()
-    net = dde.nn.FNN([input_ch] + [hidden_ch] * 6 + [output_ch], "tanh", "Glorot normal")
+    
+    # Print debug information
+    print(f"Input dimension needs to be: {initial_input.shape[1]}")
+    
+    # Create the network with correct input dimension
+    # For Burgers equation with DeepXDE 1.12.1
+    if filename.split('_')[1][0] == 'B':
+        # For TimePDE, DeepXDE expects the input dimension to match
+        # the input data shape (which is x and t for 1D PDEs)
+        net = dde.nn.FNN([initial_input.shape[1]] + [hidden_ch] * 6 + [output_ch], "tanh", "Glorot normal")
+        print(f"Creating Burgers NN with input shape: {initial_input.shape[1]}")
+    else:
+        # Original code
+        net = dde.nn.FNN([input_ch] + [hidden_ch] * 6 + [output_ch], "tanh", "Glorot normal")
+    
     model = dde.Model(data, net)
 
     return model, dataset
@@ -434,33 +450,115 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
     )
 
     if if_single_run:
+        # Calculate metrics
         errs = metric_func(test_pred, test_gt)
         errors = [np.array(err.cpu()) for err in errs]
+        print("Metrics:")
+        metric_names = ["RMSE", "Normalized RMSE", "RMSE of conserved variables", 
+                      "Maximum value of RMS error", "RMSE at boundaries", "RMSE in Fourier space"]
+        for i, (name, error) in enumerate(zip(metric_names, errors)):
+            print(f"  {name}: {error}")
         print(errors)
         pickle.dump(errors, open(model_name + ".pickle", "wb"))
 
-        # plot sample
-        plot_input = dataset.generate_plot_input(time=1.0)
-        if scenario == "pde1D":
-            xdim = dataset.xdim
-            dim = 1
-        else:
-            dim = dataset.config["plot"]["dim"]
-            xdim = dataset.config["sim"]["xdim"]
-            if dim == 2:
-                ydim = dataset.config["sim"]["ydim"]
+        try:
+            # Safely handle plot generation with CUDA tensor protection
+            try:
+                if scenario == "pde1D" and filename.split('_')[1][0] == 'B':  # Burgers equation
+                    # Create 2D visualization like the FNO/UNet plots
+                    print("Creating 2D visualization for Burgers equation")
+                    # Get the spatial domain
+                    if hasattr(dataset, 'xL') and isinstance(dataset.xL, torch.Tensor) and dataset.xL.is_cuda:
+                        dataset.xL = dataset.xL.cpu()
+                    if hasattr(dataset, 'xR') and isinstance(dataset.xR, torch.Tensor) and dataset.xR.is_cuda:
+                        dataset.xR = dataset.xR.cpu()
+                    
+                    # Define grid points in space and time
+                    x_points = np.linspace(float(dataset.xL), float(dataset.xR), dataset.xdim)
+                    t_points = np.linspace(0, 2.0, 100)  # Use 100 time points for smoother visualization
+                    
+                    # Create meshgrid
+                    X, T = np.meshgrid(x_points, t_points)
+                    X_flat = X.flatten()
+                    T_flat = T.flatten()
+                    
+                    # Prepare input for the model
+                    input_points = np.vstack((X_flat, T_flat)).T
+                    
+                    # Make predictions
+                    predictions = model.predict(input_points)[:, 0]
+                    
+                    # Reshape to 2D grid
+                    solution_field = predictions.reshape(T.shape)
+                    
+                    # Plot the solution
+                    fig, ax = plt.subplots(figsize=(10, 8))
+                    cf = ax.pcolormesh(T, X, solution_field.T, cmap='rainbow', shading='auto')
+                    fig.colorbar(cf, ax=ax)
+                    ax.set_xlabel('$t$', fontsize=14)
+                    ax.set_ylabel('$x$', fontsize=14)
+                    ax.set_title('Prediction', fontsize=18)
+                    
+                    # Save figure
+                    plt.savefig(f"{model_name}_prediction.png", dpi=300, bbox_inches='tight')
+                    plt.close()
+                    
+                    # Also create the traditional 1D slice plot
+                    try:
+                        # Try to get plot input for a specific time slice
+                        plot_input = dataset.generate_plot_input(time=1.0)
+                        
+                        if plot_input is not None:
+                            y_pred = model.predict(plot_input)[:, 0]
+                            plt.figure()
+                            plt.plot(x_points, y_pred)
+                            plt.xlabel('x')
+                            plt.ylabel('u')
+                            plt.title(f'Solution at t=1.0')
+                            plt.savefig(f"{model_name}_slice.png")
+                            plt.close()
+                    except Exception as e:
+                        print(f"Warning: Could not generate 1D slice plot - {str(e)}")
+                else:
+                    # Original plotting code for other cases
+                    # Try to get plot input
+                    plot_input = dataset.generate_plot_input(time=1.0)
+                    
+                    # If tensor attributes are on GPU, move them to CPU first
+                    if hasattr(dataset, 'xL') and isinstance(dataset.xL, torch.Tensor) and dataset.xL.is_cuda:
+                        dataset.xL = dataset.xL.cpu()
+                    if hasattr(dataset, 'xR') and isinstance(dataset.xR, torch.Tensor) and dataset.xR.is_cuda:
+                        dataset.xR = dataset.xR.cpu()
+                    
+                    if scenario == "pde1D":
+                        xdim = dataset.xdim
+                        dim = 1
+                    else:
+                        dim = dataset.config["plot"]["dim"]
+                        xdim = dataset.config["sim"]["xdim"]
+                        if dim == 2:
+                            ydim = dataset.config["sim"]["ydim"]
 
-        y_pred = model.predict(plot_input)[:, 0]
-        if dim == 1:
-            plt.figure()
-            plt.plot(y_pred)
-        elif dim == 2:
-            im_data = y_pred.reshape(xdim, ydim)
-            plt.figure()
-            plt.imshow(im_data)
+                    if plot_input is not None:
+                        y_pred = model.predict(plot_input)[:, 0]
+                        if dim == 1:
+                            plt.figure()
+                            plt.plot(y_pred)
+                        elif dim == 2:
+                            im_data = y_pred.reshape(xdim, ydim)
+                            plt.figure()
+                            plt.imshow(im_data)
 
-        plt.savefig(f"{model_name}.png")
-
+                        plt.savefig(f"{model_name}.png")
+                    plt.close()
+            except Exception as e:
+                print(f"Warning: Could not generate plot - {str(e)}")
+                # Continue execution even if plotting fails
+                
+        except Exception as e:
+            print(f"Error in visualization part: {str(e)}")
+            # Continue with the rest of the function
+            
         # TODO: implement function to get specific timestep from dataset
         # y_true = dataset[:][1][-xdim * ydim :]
     else:
@@ -471,7 +569,8 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
                  root_path='../data/', val_num=10, if_periodic_bc=True, aux_params=[None], seed='0000'):
     print(val_num, scenario)
     root_path =  "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
-    
+    flnm = "1D_Burgers_Sols_Nu0.001.hdf5"
+    #print(f"flnm: {flnm}")
     #sys.exit()
 
     if val_num == 1:  # single job
@@ -495,6 +594,29 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
         errors = [np.array(err.cpu()) for err in errs]
         print(errors)
         pickle.dump(errors, open(model_name + ".pickle", "wb"))
+    
+    # Generate standard PDF plots like FNO and UNet
+    try:
+        from pdebench.models.pinn.pinn_visualization import generate_pinn_plots_from_loaded_model
+        # Extract nu value from filename if it exists
+        nu_value = 0.01  # Default value
+        if "Nu" in flnm:
+            try:
+                nu_value = float(flnm.split("Nu")[1].split("_")[0])
+            except:
+                pass
+        
+        # Load the latest model
+        model_path = f"{flnm[:-5]}_PINN.pt" if "." in flnm else f"{flnm}_PINN.pt"
+        if os.path.exists(model_path):
+            model = dde.Model.from_checkpoint(model_path)
+            print(f"Generating standardized plots for {model_path}...")
+            plot_paths = generate_pinn_plots_from_loaded_model(model, flnm)
+            print(f"Plots saved to: {plot_paths['prediction']}")
+        else:
+            print(f"Warning: Could not find model file {model_path} for visualization")
+    except Exception as e:
+        print(f"Warning: Could not generate standard PDF plots: {str(e)}")
 
 
 if __name__ == "__main__":

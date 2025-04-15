@@ -2,7 +2,7 @@ model_name: 'Unet'
 if_training: True
 continue_training: False
 batch_size: 50
-t_train: 30
+t_train: 41 #30
 model_update: 1
 filename: 'ReacDiff_Nu0.5_Rho1.0.hdf5'
 single_file: True
@@ -24,4 +24,4 @@ modes: 12
 width: 20
 scheduler_step: 100
 scheduler_gamma: 0.5
-initial_step: 5
+initial_step: 10 # 5 

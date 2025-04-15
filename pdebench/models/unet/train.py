@@ -22,6 +22,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 from pdebench.models.unet.unet import UNet1d, UNet2d, UNet3d
 from pdebench.models.unet.utils import UNetDatasetSingle, UNetDatasetMult
 from pdebench.models.metrics import metrics
+from pdebench.utils.dataset import PDEBenchDataset
 
 def run_training(if_training,
                  continue_training,
@@ -64,7 +65,7 @@ def run_training(if_training,
     
     if single_file: 
         # Load data from my own path
-        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
+        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/ReactionDiffusion/Train/" # change either to ReactionDiffusion or Burgers
         pre_trained_base_me = "../PDEBench/pdebench/models/pre-trained-models/unet/"
         # filename
         model_name = flnm[:-5] + '_Unet'
@@ -100,19 +101,57 @@ def run_training(if_training,
                               if_test=True,
                               saved_folder=base_path)
 
-    train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
-                                               num_workers=num_workers, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
-                                             num_workers=num_workers, shuffle=False)   
+    # train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size,
+    #                                            num_workers=num_workers, shuffle=True)
+    # val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
+    #                                          num_workers=num_workers, shuffle=False)   
+
+    # t_train should be 21 too,
+    train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth")
+    val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth") 
     
     print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}")
-    
+
+
+    # batch = next(iter(val_loader))
+
+    # # Print detailed information about the batch
+    # print("\n=== Batch Structure Investigation ===")
+    # print(f"Type of batch: {type(batch)}")
+    # print(f"Length of batch (number of elements): {len(batch)}")
+    # print("\nContents of batch:")
+    # for i, item in enumerate(batch):
+    #     print(f"\nElement {i}:")
+    #     print(f"Type: {type(item)}")
+    #     if torch.is_tensor(item):
+    #         print(f"Shape: {item.shape}")
+    #         print(f"Data type: {item.dtype}")
+    #         print(f"Device: {item.device}")
+    #     else:
+    #         print(f"Value: {item}")
+
+    # # Try unpacking to see what happens
+    # try:
+    #     _, _data, _, _ = batch
+    #     print("\nUnpacking successful!")
+    #     print(f"Shape of _data: {_data.shape if torch.is_tensor(_data) else 'Not a tensor'}")
+    # except ValueError as e:
+    #     print(f"\nUnpacking failed: {e}")
+
+    # sys.exit()
+
     ################################################################
     # training and evaluation
     ################################################################
     
     #model = UNet2d(in_channels, out_channels).to(device)
-    _, _data = next(iter(val_loader))
+
+    """ Start comment """
+    _, _data, _, _ = next(iter(val_loader)) # shape of _data: torch.Size([50, 256, 101, 1])
+    first_batch = next(iter(train_loader)) 
+    print(f"shape of first_batch: {type(first_batch)}")
+    print(f"shape of _data: {_data.shape}")
+    # sys.exit()
     dimensions = len(_data.shape)
     print('Spatial Dimension', dimensions - 3)
     if training_type in ['autoregressive']:
@@ -146,6 +185,8 @@ def run_training(if_training,
                 model_name = model_name + '-AR'
         else:
             model_name = model_name + '-1-step'
+
+    """ End comment """
         
     model_path = pre_trained_base_me + model_name + ".pt"
     pre_trained_model = os.path.abspath(model_path)
@@ -185,6 +226,8 @@ def run_training(if_training,
         print(f"Initial step: {initial_step}") # The UNet-1D takes 10 as the initial step but my appraoch takes 1 as initial step. 
         #sys.exit()
         Lx, Ly, Lz = 1., 1., 1.
+        # updating x_min, x_max, y_min, y_max, t_min, t_max to suit our problem setup
+        x_min, x_max, y_min, y_max, t_min, t_max = 0., 1., 0, 1, 0., 2.
         errs = metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, 
                        model_name, x_min, x_max, y_min, y_max,
                        t_min, t_max, mode='Unet', initial_step=initial_step)
