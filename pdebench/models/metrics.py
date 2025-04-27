@@ -285,7 +285,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
     if mode=='Unet':
         with torch.no_grad():
             itot = 0
-            for xx, yy, _, _ in val_loader:
+            for xx, yy, _, _ in val_loader: # xx, yy in val_loader
                 xx = xx.to(device)
                 yy = yy.to(device)
 
@@ -323,8 +323,8 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                         = _err_RMSE, _err_nRMSE, _err_CSV, _err_Max, _err_BD, _err_F
 
                     
-                    pred_plot = pred[:1]
-                    target_plot = yy[:1]
+                    # pred_plot = pred[:1]
+                    # target_plot = yy[:1]
                     val_l2_time = torch.zeros(yy.shape[-2]).to(device)
                     # print(f"The plot, pred shape: {pred.shape}, pred[:1] : {pred_plot.shape}")
                     # print(f"The plot, pred shape: {yy.shape}, pred[:1] : {target_plot.shape}")
@@ -342,13 +342,20 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                     mean_dim.append(-1)
                     mean_dim = tuple(mean_dim)
                     val_l2_time += torch.sqrt(torch.mean((pred-yy)**2, dim=mean_dim))
+                    
+                    if itot == 10:
+                        pred_plot = pred[:1]
+                        target_plot = yy[:1]
+   
                 
                 itot += 1
 
     elif mode=='FNO':
         with torch.no_grad():
             itot = 0
-            for xx, yy, grid, _ in val_loader:
+            # pred_plot = None
+            # target_plot = None
+            for xx, yy, grid, _ in val_loader: #  for xx, yy, grid, _ in val_loader:
                 xx = xx.to(device)
                 yy = yy.to(device)
                 
@@ -373,8 +380,8 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                 if itot == 0:
                     err_RMSE, err_nRMSE, err_CSV, err_Max, err_BD, err_F \
                         = _err_RMSE, _err_nRMSE, _err_CSV, _err_Max, _err_BD, _err_F
-                    pred_plot = pred[:1]
-                    target_plot = yy[:1]
+                    # pred_plot = pred[:1]
+                    # target_plot = yy[:1]
                     val_l2_time = torch.zeros(yy.shape[-2]).to(device)
                 else:
                     err_RMSE += _err_RMSE
@@ -388,13 +395,22 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                     mean_dim.append(-1)
                     mean_dim = tuple(mean_dim)
                     val_l2_time += torch.sqrt(torch.mean((pred-yy)**2, dim=mean_dim))
+                    
+                    if itot == 10:
+                        pred_plot = pred[:1]
+                        target_plot = yy[:1]
+                        # print(f"pred_plot shape: {pred_plot.shape}, target_plot shape: {target_plot.shape}")
+                        # sys.exit()
+                
+                # print(f"itot: {itot}")        
+                # print(f"data range of the ground truth: {yy[:1].min()} to {yy[:1].max()}")
 
                 itot += 1
 
     elif mode == "PINN":
         raise NotImplementedError
 
-
+    # sys.exit()
     err_RMSE = np.array(err_RMSE.data.cpu()/itot)
     err_nRMSE = np.array(err_nRMSE.data.cpu()/itot)
     err_CSV = np.array(err_CSV.data.cpu()/itot)
@@ -409,7 +425,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
     print('RMSE in Fourier space: {0}'.format(err_F))
     
     val_l2_time = val_l2_time/itot
-    
+
     if plot:
         dim = len(yy.shape) - 3
         plt.ioff()
@@ -420,16 +436,21 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                        extent=[t_min, t_max, x_min, x_max], origin='lower', aspect='auto')
             h.set_clim(target_plot[...,channel_plot].min(), target_plot[...,channel_plot].max())
             divider = make_axes_locatable(ax)
+            
+            data = target_plot[...,channel_plot].squeeze().detach().cpu().numpy()
+            print(f"Data range: {data.min()} to {data.max()}")
+            
+            
             cax = divider.append_axes("right", size="5%", pad=0.05)
             cbar = fig.colorbar(h, cax=cax)
             cbar.ax.tick_params(labelsize=30)
-            ax.set_title("FNO", fontsize=30)
+            ax.set_title(f"U-Net", fontsize=30)
             ax.tick_params(axis='x',labelsize=30)
             ax.tick_params(axis='y',labelsize=30)
             ax.set_ylabel("$x$", fontsize=30)
             ax.set_xlabel("$t$", fontsize=30)
             plt.tight_layout()
-            filename = model_name + '_pred.pdf'
+            filename = model_name + '_32_pred.pdf'
             plt.savefig(filename)
             
             fig, ax = plt.subplots(figsize=(6.5,6))
@@ -446,7 +467,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
             ax.set_ylabel("$x$", fontsize=30)
             ax.set_xlabel("$t$", fontsize=30)
             plt.tight_layout()
-            filename = model_name + '_data.pdf'
+            filename = model_name + '_32_data.pdf'
             plt.savefig(filename)
     
         elif dim == 2:

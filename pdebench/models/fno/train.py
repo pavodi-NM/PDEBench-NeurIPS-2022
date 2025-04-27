@@ -60,7 +60,7 @@ def run_training(if_training,
     
     if single_file:
         # Load data from my own path
-        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/ReactionDiffusion/Train/" #change either to ReactionDiffusion or Burgers
+        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/" #change either to ReactionDiffusion or Burgers
         pre_trained_base_me = "../PDEBench/pdebench/models/pre-trained-models/fno/"
         # filename
         model_name = flnm[:-5] + '_FNO'
@@ -107,19 +107,24 @@ def run_training(if_training,
     #                                          num_workers=num_workers, shuffle=False)
     
 
-    # t_train should be 21 too,
+    # t_train should be 21 too, for the reaction diffusion
 
-    train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth")
-    val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth")  
+    # train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth")
+    # val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth")  
+    
+    # for burgers
+    train_loader = torch.load('save_data/burgers/train_0.01_32.pth')
+    val_loader = torch.load('save_data/burgers/val_0.01_32.pth')
     
     print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}, filename: {flnm}")
     ################################################################
     # training and evaluation
     ################################################################
     
-    _, _data, _, _ = next(iter(val_loader))
+    _, _data, _, _ = next(iter(val_loader)) #   _, _data, _, _ = next(iter(val_loader))
     dimensions = len(_data.shape)
     print('Spatial Dimension', dimensions - 3)
+    # sys.exit()
     if dimensions == 4:
         model = FNO1d(num_channels=num_channels,
                       width=width,
@@ -177,6 +182,7 @@ def run_training(if_training,
         t_min = 0.
         t_max = 2.
         # print(f"x_min: {x_min}, x_max: {x_max}, y_min: {y_min}, y_max: {y_max}, t_min: {t_min}, t_max: {t_max}")
+        # print(f"channel_plot: {channel_plot}") # 0
         # sys.exit()
         errs = metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot,
                        model_name, x_min, x_max, y_min, y_max,

@@ -65,7 +65,7 @@ def run_training(if_training,
     
     if single_file: 
         # Load data from my own path
-        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/ReactionDiffusion/Train/" # change either to ReactionDiffusion or Burgers
+        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/" # change either to ReactionDiffusion or Burgers
         pre_trained_base_me = "../PDEBench/pdebench/models/pre-trained-models/unet/"
         # filename
         model_name = flnm[:-5] + '_Unet'
@@ -106,9 +106,13 @@ def run_training(if_training,
     # val_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size,
     #                                          num_workers=num_workers, shuffle=False)   
 
-    # t_train should be 21 too,
-    train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth")
-    val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth") 
+    # # t_train should be 21 too,
+    # train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth")
+    # val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth") 
+    
+    # for burgers 
+    train_loader = torch.load('save_data/burgers/train_0.01_32.pth')
+    val_loader = torch.load('save_data/burgers/val_0.01_32.pth')
     
     print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}")
 
@@ -147,7 +151,8 @@ def run_training(if_training,
     #model = UNet2d(in_channels, out_channels).to(device)
 
     """ Start comment """
-    _, _data, _, _ = next(iter(val_loader)) # shape of _data: torch.Size([50, 256, 101, 1])
+    #_, _data, _, _ = next(iter(val_loader)) # shape of _data: torch.Size([50, 256, 101, 1])
+    _, _data, _, _ = next(iter(val_loader))
     first_batch = next(iter(train_loader)) 
     print(f"shape of first_batch: {type(first_batch)}")
     print(f"shape of _data: {_data.shape}")
@@ -228,6 +233,7 @@ def run_training(if_training,
         Lx, Ly, Lz = 1., 1., 1.
         # updating x_min, x_max, y_min, y_max, t_min, t_max to suit our problem setup
         x_min, x_max, y_min, y_max, t_min, t_max = 0., 1., 0, 1, 0., 2.
+
         errs = metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, 
                        model_name, x_min, x_max, y_min, y_max,
                        t_min, t_max, mode='Unet', initial_step=initial_step)
@@ -263,6 +269,8 @@ def run_training(if_training,
     if ar_mode:
         #print(f"This is the the autoregressive mode or pushforward training and training type is : {training_type}") # autoregressive
         #sys.exit()
+        # print(f"This is the value of t_train: {t_train}")
+        # sys.exit()
         for ep in range(start_epoch, epochs):
             model.train()
             t1 = default_timer()
