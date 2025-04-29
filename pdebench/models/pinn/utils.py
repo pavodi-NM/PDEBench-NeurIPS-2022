@@ -182,9 +182,6 @@ class PINNDataset2D(Dataset):
     def __getitem__(self, idx):
         return self.data_input[idx, :], self.data_output[idx].unsqueeze(1)
 
-    def get_name(self):
-        return self.config["name"]
-
     def get_test_data(self, n_last_time_steps, n_components=1):
         n_x = len(self.data_grid_x)
         n_y = len(self.data_grid_y)
@@ -329,10 +326,18 @@ class PINNDatasetDiffSorption(PINNDataset1D):
         return (self.data_input[:Nx, :], np.expand_dims(u0, 1))
 
 class PINNDataset1Dpde(Dataset):
-    def __init__(self, filename, root_path='data', val_batch_idx=-1):
+    def __init__(self, filename, root_path='data', val_batch_idx=-1, time_size=None, spatial_size=None):
         """
         :param filename: filename that contains the dataset
         :type filename: STR
+        :param root_path: root path of the dataset
+        :type root_path: STR
+        :param val_batch_idx: index of the batch to use for validation
+        :type val_batch_idx: INT
+        :param time_size: number of time steps to use (exact)
+        :type time_size: INT
+        :param spatial_size: number of spatial points to use (exact)
+        :type spatial_size: INT
         """
 
         # load data file
@@ -341,22 +346,52 @@ class PINNDataset1Dpde(Dataset):
 
         # build input data from individual dimensions
         # dim x = [x]
-        self.data_grid_x = torch.tensor(h5_file["x-coordinate"], dtype=torch.float)
-        self.dx = self.data_grid_x[1] - self.data_grid_x[0]
-        self.xL = self.data_grid_x[0] - 0.5 * self.dx
-        self.xR = self.data_grid_x[-1] + 0.5 * self.dx
+        self.original_data_grid_x = torch.tensor(h5_file["x-coordinate"], dtype=torch.float)
+        self.original_xdim = self.original_data_grid_x.size(0)
+        
+        # Apply spatial downsampling if requested - use exact indices
+        if spatial_size is not None and spatial_size < self.original_xdim:
+            # Use linear spacing for exact number of points
+            idx_x = np.linspace(0, self.original_xdim-1, spatial_size, dtype=int)
+            self.data_grid_x = self.original_data_grid_x[idx_x]
+        else:
+            self.data_grid_x = self.original_data_grid_x
+            spatial_size = self.original_xdim
+            
+        self.dx = self.data_grid_x[1] - self.data_grid_x[0] if len(self.data_grid_x) > 1 else 0
+        self.xL = self.data_grid_x[0] - 0.5 * self.dx if len(self.data_grid_x) > 0 else 0
+        self.xR = self.data_grid_x[-1] + 0.5 * self.dx if len(self.data_grid_x) > 0 else 0
         self.xdim = self.data_grid_x.size(0)
+        
         # # dim t = [t]
-        self.data_grid_t = torch.tensor(h5_file["t-coordinate"], dtype=torch.float)
+        self.original_data_grid_t = torch.tensor(h5_file["t-coordinate"], dtype=torch.float)
+        self.original_tdim = self.original_data_grid_t.size(0)
 
         # main data
         keys = list(h5_file.keys())
         keys.sort()
+        
         if 'tensor' in keys:
-            self.data_output = torch.tensor(np.array(h5_file["tensor"][val_batch_idx]),
-                                            dtype=torch.float)
-            # permute from [t, x] -> [x, t]
-            self.data_output = self.data_output.T
+            # Get the original data
+            original_data = torch.tensor(np.array(h5_file["tensor"][val_batch_idx]), dtype=torch.float)
+            
+            # Apply time downsampling if requested - use exact indices
+            if time_size is not None and time_size < original_data.shape[0]:
+                # Use linear spacing for exact number of points
+                idx_t = np.linspace(0, original_data.shape[0]-1, time_size, dtype=int)
+                downsampled_data = original_data[idx_t]
+            else:
+                downsampled_data = original_data
+                time_size = original_data.shape[0]
+                
+            # Apply spatial downsampling if requested - use exact indices
+            if spatial_size is not None and spatial_size < original_data.shape[1]:
+                # Use linear spacing for exact number of points - reuse idx_x from above
+                if 'idx_x' not in locals():
+                    idx_x = np.linspace(0, original_data.shape[1]-1, spatial_size, dtype=int)
+                downsampled_data = downsampled_data[:, idx_x]
+            
+            self.data_output = downsampled_data.T  # permute from [t, x] -> [x, t]
 
             # for init/boundary conditions
             self.init_data = self.data_output[..., 0, None]
@@ -367,6 +402,21 @@ class PINNDataset1Dpde(Dataset):
             _data1 = np.array(h5_file["density"][val_batch_idx])
             _data2 = np.array(h5_file["Vx"][val_batch_idx])
             _data3 = np.array(h5_file["pressure"][val_batch_idx])
+            
+            # Apply time downsampling if requested - use exact indices
+            if time_size is not None and time_size < _data1.shape[0]:
+                idx_t = np.linspace(0, _data1.shape[0]-1, time_size, dtype=int)
+                _data1 = _data1[idx_t]
+                _data2 = _data2[idx_t]
+                _data3 = _data3[idx_t]
+                
+            # Apply spatial downsampling if requested - use exact indices
+            if spatial_size is not None and spatial_size < _data1.shape[1]:
+                idx_x = np.linspace(0, _data1.shape[1]-1, spatial_size, dtype=int)
+                _data1 = _data1[:, idx_x]
+                _data2 = _data2[:, idx_x]
+                _data3 = _data3[:, idx_x]
+            
             _data = np.concatenate([_data1[...,None], _data2[...,None], _data3[...,None]], axis=-1)
             # permute from [t, x] -> [x, t]
             _data = np.transpose(_data, (1, 0, 2))
@@ -380,7 +430,15 @@ class PINNDataset1Dpde(Dataset):
             self.bd_data_R = self.data_output[-1]
 
         self.tdim = self.data_output.size(1)
-        self.data_grid_t = self.data_grid_t[:self.tdim]
+        
+        # Ensure data_grid_t matches the time dimension of data_output exactly
+        if time_size is not None and time_size < self.original_tdim:
+            idx_t = np.linspace(0, self.original_tdim-1, time_size, dtype=int)
+            self.data_grid_t = self.original_data_grid_t[idx_t]
+            # Make sure the length matches exactly
+            self.data_grid_t = self.data_grid_t[:self.tdim]
+        else:
+            self.data_grid_t = self.original_data_grid_t[:self.tdim]
 
         XX, TT = torch.meshgrid(
             [self.data_grid_x, self.data_grid_t],
@@ -394,6 +452,38 @@ class PINNDataset1Dpde(Dataset):
             self.data_output = self.data_output.reshape(-1, 1)
         else:
             self.data_output = self.data_output.reshape(-1, 3)
+        
+        # Print info about the dataset shapes
+        print(f"Dataset loaded with exact dimensions: spatial_points={self.xdim}, time_steps={self.tdim}")
+        
+        # Print more detailed information about tensor shapes
+        if 'tensor' in keys:
+            print(f"Original tensor shape: [batch_size, time, space] = [?, {self.original_tdim}, {self.original_xdim}]")
+            print(f"Downsampled tensor shape: [space, time] = [{self.xdim}, {self.tdim}]")
+            print(f"Flattened data_output shape (space*time, output_ch): {self.data_output.shape}")
+            print(f"Expected flattened size: {self.xdim * self.tdim}")
+        else:
+            print(f"Original CFD data shape: [batch_size, time, space, fields]")
+            print(f"Downsampled CFD shape: [space, time, fields]")
+            print(f"Flattened data_output shape (space*time, output_ch): {self.data_output.shape}")
+        
+        print(f"data_input elements (space*time, coord_dims): {self.data_input.shape}")
+        print(f"Initial condition shape: {self.init_data.shape}")
+        print(f"Boundary condition shapes: L={self.bd_data_L.shape}, R={self.bd_data_R.shape}")
+    
+    # Add a helper method to reshape data for plotting
+    def reshape_for_plotting(self):
+        """
+        Reshape the data_output for plotting as a 2D heatmap
+        
+        Returns:
+            tensor: Reshaped tensor with shape [1, spatial_size, time_size, channels]
+                   where channels=1 for scalar fields
+        """
+        n_components = 1 if self.data_output.shape[1] == 1 else self.data_output.shape[1]
+        reshaped = self.data_output.reshape(self.xdim, self.tdim, n_components)
+        # Add batch dimension [1, spatial, temporal, channels]
+        return reshaped.unsqueeze(0)
 
     def get_initial_condition(self):
         # return (self.data_grid_x[:, None], self.init_data)
@@ -413,9 +503,9 @@ class PINNDataset1Dpde(Dataset):
         test_output = self.data_output.reshape((n_x, n_t, n_components))
 
         # extract last n time steps
-        test_input_x = test_input_x[:, -n_last_time_steps:]
-        test_input_t = test_input_t[:, -n_last_time_steps:]
-        test_output = test_output[:, -n_last_time_steps:, :]
+        test_input_x = test_input_x[:, :n_last_time_steps]
+        test_input_t = test_input_t[:, :n_last_time_steps]
+        test_output = test_output[:, :n_last_time_steps, :]
 
         test_input = torch.vstack([test_input_x.ravel(), test_input_t.ravel()]).T
 

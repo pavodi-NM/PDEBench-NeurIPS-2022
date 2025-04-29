@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import os, sys
 import torch
 
+
 from typing import Tuple
 
 from pdebench.models.pinn.utils import (
@@ -32,6 +33,8 @@ from pdebench.models.pinn.pde_definitions import (
 )
 
 from pdebench.models.metrics import metrics, metric_func
+
+from pdebench.models.pinn.pinn_heatmap import plot_heatmap 
 
 
 def setup_diffusion_sorption(filename, seed):
@@ -194,7 +197,9 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
                 xL=0.,
                 xR=1.,
                 if_periodic_bc=True,
-                aux_params=[0.1]):
+                aux_params=[0.1],
+                time_size=None,
+                spatial_size=None):
 
     print(f"setting up pde 1D")
     #sys.exit()
@@ -220,10 +225,48 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
             pde = lambda x, y: pde_CFD1d(x, y, aux_params[0])
     geomtime = dde.geometry.GeometryXTime(geom, timedomain)
 
-    dataset = PINNDataset1Dpde(filename, root_path=root_path, val_batch_idx=val_batch_idx)
-    print(f"Data set loaded successfully: {dataset}")
+    # for i in range(0,10000):
+    dataset = PINNDataset1Dpde(filename, root_path=root_path, val_batch_idx=320, 
+                                time_size=41, spatial_size=256) 
+        # print(f"Data set loaded successfully: {dataset}")
+        
+        # Print tensor shapes to verify sizes
+        # print(f"Original spatial dimension: {dataset.original_xdim}, temporal dimension: {dataset.original_tdim}")
+        # print(f"Downsampled spatial dimension: {dataset.xdim}, temporal dimension: {dataset.tdim}")
+        # print(f"data_input shape: {dataset.data_input.shape}")
+        # print(f"data_output shape: {dataset.data_output.shape}")
+        # print(f"data output reshaped: {dataset.data_output.reshape(-1,1).shape}")
+        
+        # Demonstrate the reshape_for_plotting method
+    plot_data = dataset.reshape_for_plotting()
+    data_a1 = plot_data.squeeze(0).detach().cpu().numpy()
+        # data_test = data_a1[..., 0].squeeze()
+        # if data_test.max() > 1.3 and data_test.max() < 1.32 and data_test.min() > 0.24 and data_test.min() < 0.26:
+        #     print(f" i value {i} has max value {data_test.max()} and min value {data_test.min()}")
+   
+    plot_heatmap(data_a1, data_a1, channel_plot=0, t_min=0., t_max=2., x_min=0., x_max=1., model_name="PINN_TEST_LOOP")
+    """ 
+    
+    Best model at step 14500:
+    train loss: 4.35e-04
+    test loss: 4.35e-04
+    test metric: []`
+    """
     #sys.exit()
-    # prepare initial condition
+    # print(f"Data reshaped for plotting: {data_a1.shape}, type: {type(plot_data)}")
+    # print(f"Expected shape for plotting: [1, {dataset.xdim}, {dataset.tdim}, 1]")
+    
+    # If you uncomment this, you can save a sample visualization
+    # import matplotlib.pyplot as plt
+    # plt.figure(figsize=(10, 8))
+    # plt.pcolormesh(plot_data[0, :, :, 0].cpu().numpy(), cmap='viridis')
+    # plt.colorbar()
+    # plt.title(f'Solution field with {dataset.xdim}x{dataset.tdim} resolution')
+    # plt.savefig('downsampled_solution.png')
+    # plt.close()
+    
+    #sys.exit()
+    #  prepare initial condition
     initial_input, initial_u = dataset.get_initial_condition()
     #print(f"initial input: {initial_input.shape}, initial_u: {initial_u.shape}")
     if filename.split('_')[1][0] == 'C':
@@ -281,7 +324,6 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
     # Print debug information
     print(f"Input dimension needs to be: {initial_input.shape[1]}")
     
-    # Create the network with correct input dimension
     # For Burgers equation with DeepXDE 1.12.1
     if filename.split('_')[1][0] == 'B':
         # For TimePDE, DeepXDE expects the input dimension to match
@@ -378,7 +420,8 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
                   input_ch, output_ch,
                   root_path, val_batch_idx, if_periodic_bc, aux_params,
                   if_single_run,
-                  seed):
+                  seed,
+                  time_size=None, spatial_size=None):
     if scenario == "swe2d":
         model, dataset = setup_swe_2d(filename=flnm, seed=seed)
         n_components = 1
@@ -395,7 +438,9 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
                                      output_ch=output_ch,
                                      val_batch_idx=val_batch_idx,
                                      if_periodic_bc=if_periodic_bc,
-                                     aux_params=aux_params)
+                                     aux_params=aux_params,
+                                     time_size=time_size,
+                                     spatial_size=spatial_size)
         if flnm.split('_')[1][0] == 'C':
             n_components = 3
         else:
@@ -435,7 +480,7 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
     )
 
     test_input, test_gt = dataset.get_test_data(
-        n_last_time_steps=20, n_components=n_components
+        n_last_time_steps=41, n_components=n_components
     )
     # select only n_components of output
     # dirty hack for swe2d where we predict more components than we have data on
@@ -443,11 +488,43 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
 
     # prepare data for metrics eval
     test_pred = dataset.unravel_tensor(
-        test_pred, n_last_time_steps=20, n_components=n_components
+        test_pred, n_last_time_steps=41, n_components=n_components
     )
     test_gt = dataset.unravel_tensor(
-        test_gt, n_last_time_steps=20, n_components=n_components
+        test_gt, n_last_time_steps=41, n_components=n_components
     )
+
+    # Add heatmap plots for prediction vs ground truth
+    if scenario == "pde1D" and flnm.split('_')[1][0] == 'B':  # Burgers equation
+        try:
+            # test_pred and test_gt have shape [1, n_x, n_t, n_components] from unravel_tensor
+            # We need [n_x, n_t, n_components] for plot_heatmap
+            pred_heatmap = test_pred.squeeze(0).detach().cpu().numpy()
+            gt_heatmap = test_gt.squeeze(0).detach().cpu().numpy()
+            
+            # Verify shapes are correct for plotting
+            print(f"Prediction heatmap shape: {pred_heatmap.shape}, Ground truth shape: {gt_heatmap.shape}")
+            # Should be [n_x, n_t, n_components]
+            
+            # Get spatial-temporal domain limits from the dataset
+            t_min = float(dataset.data_grid_t[0].cpu())
+            t_max = float(dataset.data_grid_t[-1].cpu())
+            x_min = float(dataset.data_grid_x[0].cpu())
+            x_max = float(dataset.data_grid_x[-1].cpu())
+            
+            # Generate heatmaps
+            from pdebench.models.pinn.pinn_heatmap import plot_heatmap
+            plot_heatmap(
+                pred_heatmap, gt_heatmap, 
+                channel_plot=0, 
+                t_min=0., t_max=2., 
+                x_min=0., x_max=1., 
+                model_name=f"{model_name}_test_results"
+            )
+            print(f"Heatmap plots successfully saved with prefix: {model_name}_test_results")
+            sys.exit()
+        except Exception as e:
+            print(f"Warning: Could not generate heatmap plots - {str(e)}")
 
     if if_single_run:
         # Calculate metrics
@@ -464,7 +541,7 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
         try:
             # Safely handle plot generation with CUDA tensor protection
             try:
-                if scenario == "pde1D" and filename.split('_')[1][0] == 'B':  # Burgers equation
+                if scenario == "pde1D" and flnm.split('_')[1][0] == 'B':  # Burgers equation
                     # Create 2D visualization like the FNO/UNet plots
                     print("Creating 2D visualization for Burgers equation")
                     # Get the spatial domain
@@ -566,7 +643,8 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
 
 def run_training(scenario, epochs, learning_rate, model_update, flnm,
                  input_ch=1, output_ch=1,
-                 root_path='../data/', val_num=10, if_periodic_bc=True, aux_params=[None], seed='0000'):
+                 root_path='../data/', val_num=10, if_periodic_bc=True, aux_params=[None], 
+                 time_size=None, spatial_size=None, seed='0000'):
     print(val_num, scenario)
     root_path =  "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
     flnm = "1D_Burgers_Sols_Nu0.001.hdf5"
@@ -577,13 +655,13 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
         _run_training(scenario, epochs, learning_rate, model_update, flnm,
                       input_ch, output_ch,
                       root_path, -val_num, if_periodic_bc, aux_params,
-                      if_single_run=True, seed=seed)
+                      if_single_run=True, seed=seed, time_size=time_size, spatial_size=spatial_size)
     else:
         for val_batch_idx in range(-1, -val_num, -1):
             test_pred, test_gt, model_name = _run_training(scenario, epochs, learning_rate, model_update, flnm,
                                                            input_ch, output_ch,
                                                            root_path, val_batch_idx, if_periodic_bc, aux_params,
-                                                           if_single_run=False, seed=seed)
+                                                           if_single_run=False, seed=seed, time_size=time_size, spatial_size=spatial_size)
             if val_batch_idx == -1:
                 pred, target = test_pred.unsqueeze(0), test_gt.unsqueeze(0)
             else:
@@ -613,6 +691,43 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
             print(f"Generating standardized plots for {model_path}...")
             plot_paths = generate_pinn_plots_from_loaded_model(model, flnm)
             print(f"Plots saved to: {plot_paths['prediction']}")
+            
+            # Generate heatmap visualization with custom plotting function
+            try:
+                from pdebench.models.pinn.pinn_heatmap import plot_heatmap
+                
+                # For Burgers equation, create x-t space for prediction
+                if "Burgers" in flnm:
+                    # Define domain based on the loaded model and dataset
+                    x_min, x_max = 0.0, 1.0
+                    t_min, t_max = 0.0, 2.0
+                    
+                    # Create a uniform grid for visualization
+                    x_points = np.linspace(x_min, x_max, 256)
+                    t_points = np.linspace(t_min, t_max, 41)
+                    
+                    # Prepare meshgrid and input points for prediction
+                    X, T = np.meshgrid(x_points, t_points)
+                    input_points = np.vstack((X.flatten(), T.flatten())).T
+                    
+                    # Make prediction
+                    pred = model.predict(input_points)[:, 0]
+                    pred_reshaped = pred.reshape(T.shape)
+                    
+                    # Transpose to get [x, t, channel] format expected by plot_heatmap
+                    pred_heatmap = pred_reshaped.T[:, :, None]
+                    
+                    # Use the same data for both plots - in real use case, you'd have ground truth
+                    plot_heatmap(
+                        pred_heatmap, pred_heatmap,  # Replace second param with ground truth
+                        channel_plot=0,
+                        t_min=t_min, t_max=t_max,
+                        x_min=x_min, x_max=x_max,
+                        model_name=f"{flnm[:-5]}_PINN_heatmap"
+                    )
+                    print(f"Heatmap plots saved with prefix: {flnm[:-5]}_PINN_heatmap")
+            except Exception as e:
+                print(f"Warning: Could not generate custom heatmap plots: {str(e)}")
         else:
             print(f"Warning: Could not find model file {model_path} for visualization")
     except Exception as e:
