@@ -323,8 +323,8 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                         = _err_RMSE, _err_nRMSE, _err_CSV, _err_Max, _err_BD, _err_F
 
                     
-                    # pred_plot = pred[:1]
-                    # target_plot = yy[:1]
+                    pred_plot = pred[:1]
+                    target_plot = yy[:1]
                     val_l2_time = torch.zeros(yy.shape[-2]).to(device)
                     # print(f"The plot, pred shape: {pred.shape}, pred[:1] : {pred_plot.shape}")
                     # print(f"The plot, pred shape: {yy.shape}, pred[:1] : {target_plot.shape}")
@@ -343,9 +343,16 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
                     mean_dim = tuple(mean_dim)
                     val_l2_time += torch.sqrt(torch.mean((pred-yy)**2, dim=mean_dim))
                     
-                    if itot == 10:
-                        pred_plot = pred[:1]
-                        target_plot = yy[:1]
+                    # if itot == 10:
+                    #     pred_plot = pred[30:31]
+                    #     target_plot = yy[30:31]
+                        
+                    # for i in range(yy.shape[0]):
+                    #     # print(yy[i, :, :].shape, yy.shape, yy[i,...,0].shape)
+                    #     # sys.exit()
+                    #     if yy[i, ..., 0].min() > 1.1:
+                    #         print(f"i: {i}, yy max: {yy[i, ..., 0].min()}, itot: {itot}")
+                    #         sys.exit()
    
                 
                 itot += 1
@@ -425,6 +432,14 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
     print('RMSE in Fourier space: {0}'.format(err_F))
     
     val_l2_time = val_l2_time/itot
+    
+    #print(f"pred_plot shape: {pred_plot.shape}, target_plot shape: {target_plot.shape}") #  torch.Size([0, 256, 21, 1]), target_plot shape: torch.Size([0, 256, 21, 1])
+    #sys.exit()
+    # print(pred_plot[...,channel_plot].squeeze().detach().cpu().numpy().shape)
+    # print(target_plot[...,channel_plot].squeeze().detach().cpu().numpy().shape)
+    # a = pred_plot
+    # print(a.shape, pred_plot.shape, type(a), type(pred_plot))
+    # sys.exit()
 
     if plot:
         dim = len(yy.shape) - 3
@@ -438,7 +453,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
             divider = make_axes_locatable(ax)
             
             data = target_plot[...,channel_plot].squeeze().detach().cpu().numpy()
-            print(f"Data range: {data.min()} to {data.max()}")
+            print(f"Data range: {data.min()} to {data.max()}, data shape: {data.shape}")
             
             
             cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -450,7 +465,7 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
             ax.set_ylabel("$x$", fontsize=30)
             ax.set_xlabel("$t$", fontsize=30)
             plt.tight_layout()
-            filename = model_name + '_32_pred.pdf'
+            filename = model_name + '_32_predt.pdf'
             plt.savefig(filename)
             
             fig, ax = plt.subplots(figsize=(6.5,6))
@@ -461,13 +476,13 @@ def metrics(val_loader, model, Lx, Ly, Lz, plot, channel_plot, model_name, x_min
             cax = divider.append_axes("right", size="5%", pad=0.05)
             cbar = fig.colorbar(h, cax=cax)
             cbar.ax.tick_params(labelsize=30)
-            ax.set_title("Data", fontsize=30)
+            ax.set_title("Data-Test510", fontsize=30)
             ax.tick_params(axis='x',labelsize=30)
             ax.tick_params(axis='y',labelsize=30)
             ax.set_ylabel("$x$", fontsize=30)
             ax.set_xlabel("$t$", fontsize=30)
             plt.tight_layout()
-            filename = model_name + '_32_data.pdf'
+            filename = model_name + '_32_datat.pdf'
             plt.savefig(filename)
     
         elif dim == 2:

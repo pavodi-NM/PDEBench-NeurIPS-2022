@@ -65,7 +65,16 @@ def run_training(if_training,
     
     if single_file: 
         # Load data from my own path
-        base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/" # change either to ReactionDiffusion or Burgers
+        """ Double check the path either to ReactionDiffusion or Burgers """
+        if flnm.split('_')[0] == 'ReacDiff':
+            base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/ReactionDiffusion/Train/" # change either to ReactionDiffusion or Burgers
+            
+        elif flnm.split('_')[0] == 'Burgers':
+            base_path_me  = "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/" # change either to ReactionDiffusion or Burgers
+            
+        else:
+            raise ValueError(f"flnm: {flnm} is not a valid file name")
+        
         pre_trained_base_me = "../PDEBench/pdebench/models/pre-trained-models/unet/"
         # filename
         model_name = flnm[:-5] + '_Unet'
@@ -107,12 +116,14 @@ def run_training(if_training,
     #                                          num_workers=num_workers, shuffle=False)   
 
     # # t_train should be 21 too,
-    # train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth")
-    # val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth") 
     
-    # for burgers 
-    train_loader = torch.load('save_data/burgers/train_0.01_32.pth')
-    val_loader = torch.load('save_data/burgers/val_0.01_32.pth')
+    """ Reaction Diffusion """
+    train_loader = torch.load("save_data/reaction/train_0.5_bs50.pth") # train_5_10
+    val_loader = torch.load("save_data/reaction/val_0.5_bs50.pth") # val_5_10
+
+    """ Burgers """
+    # train_loader = torch.load('save_data/burgers/train_0.01_32.pth')
+    # val_loader = torch.load('save_data/burgers/val_0.01_32.pth')
     
     print(f"train_loader: {len(train_loader)}, val_loader: {len(val_loader)}")
 

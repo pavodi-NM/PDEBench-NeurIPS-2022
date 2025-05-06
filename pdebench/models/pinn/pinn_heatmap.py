@@ -31,7 +31,7 @@ def plot_heatmap(pred_plot, target_plot, channel_plot=0, t_min=0., t_max=2., x_m
     ax.set_ylabel("$x$", fontsize=30)
     ax.set_xlabel("$t$", fontsize=30)
     plt.tight_layout()
-    filename = model_name + '_32_pred.pdf'
+    filename = model_name + '_REACTDIFF_pred.pdf'
     plt.savefig(filename)
 
     fig, ax = plt.subplots(figsize=(6.5,6))
@@ -48,7 +48,7 @@ def plot_heatmap(pred_plot, target_plot, channel_plot=0, t_min=0., t_max=2., x_m
     ax.set_ylabel("$x$", fontsize=30)
     ax.set_xlabel("$t$", fontsize=30)
     plt.tight_layout()
-    filename = model_name + '_32_data.pdf'
+    filename = model_name + '_REACTDIFF_data.pdf'
     plt.savefig(filename)
     
     return 

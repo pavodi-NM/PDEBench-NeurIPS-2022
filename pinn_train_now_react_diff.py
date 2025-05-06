@@ -202,6 +202,7 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
                 spatial_size=None):
 
     print(f"setting up pde 1D")
+    print(f"filename: {filename}")
     #sys.exit()
     
     # TODO: read from dataset config file
@@ -224,57 +225,34 @@ def setup_pde1D(filename="1D_Advection_Sols_beta0.1.hdf5",
             timedomain = dde.geometry.TimeDomain(0, 1.0)
             pde = lambda x, y: pde_CFD1d(x, y, aux_params[0])
     geomtime = dde.geometry.GeometryXTime(geom, timedomain)
+
+    # for i in range(0,10000):
+    dataset = PINNDataset1Dpde(filename, root_path=root_path, val_batch_idx=2,   
+                                time_size=21, spatial_size=256) 
+    print(f"Data set loaded successfully: {dataset}")  # vak_batch_idx = 320 for burgers
     
-    
-    dataset = PINNDataset1Dpde(filename, root_path=root_path, val_batch_idx=1005, 
-                                time_size=21, spatial_size=256)
-    
+    # Print tensor shapes to verify sizes
+    print(f"Original spatial dimension: {dataset.original_xdim}, temporal dimension: {dataset.original_tdim}")
+    print(f"Downsampled spatial dimension: {dataset.xdim}, temporal dimension: {dataset.tdim}")
+    print(f"data_input shape: {dataset.data_input.shape}")
+    print(f"data_output shape: {dataset.data_output.shape}")
+    print(f"data output reshaped: {dataset.data_output.reshape(-1,1).shape}")
+        
+        # Demonstrate the reshape_for_plotting method
     plot_data = dataset.reshape_for_plotting()
     data_a1 = plot_data.squeeze(0).detach().cpu().numpy()
-
-    # for i in range(0, 10000):
-    #     dataset = PINNDataset1Dpde(filename, root_path=root_path, val_batch_idx=i, 
-    #                             time_size=21, spatial_size=256) 
-    #     # print(f"Data set loaded successfully: {dataset}")  # 320
-        
-    #     # Print tensor shapes to verify sizes
-    #     # print(f"Original spatial dimension: {dataset.original_xdim}, temporal dimension: {dataset.original_tdim}")
-    #     # print(f"Downsampled spatial dimension: {dataset.xdim}, temporal dimension: {dataset.tdim}")
-    #     # print(f"data_input shape: {dataset.data_input.shape}")
-    #     # print(f"data_output shape: {dataset.data_output.shape}")
-    #     # print(f"data output reshaped: {dataset.data_output.reshape(-1,1).shape}")
-        
-    #     # Demonstrate the reshape_for_plotting method
-    #     plot_data = dataset.reshape_for_plotting()
-    #     data_a1 = plot_data.squeeze(0).detach().cpu().numpy()
-    #     data_test = data_a1[..., 0].squeeze()
-    #     print(f"data test min: {data_test.min()}, data test max: {data_test.max()}")
-        
-    #     if data_test.min() > 0.000258 and data_test.min() < 0.00025999 and data_test.max() < 0.999688446521759:
-    #         print(f" i value {i} has max value {data_test.max()} and min value {data_test.min()}")
-    #         print("found")
-    #         sys.exit()
-        
-    #     if data_test.min() > 0.000258 and data_test.min() < 0.00026 and data_test.max() > 0.9995 and data_test.max() < 0.9997:
-    #         print(f" i value {i} has max value {data_test.max()} and min value {data_test.min()}")
-    #         break 
-    #         sys.exit()
-    
-    model_name = "PINN_ESSAY_539"
-    plot_heatmap(data_a1, data_a1, channel_plot=0, t_min=0., t_max=2., x_min=0., x_max=1., model_name=model_name)
-    # sys.exit()
+        # data_test = data_a1[..., 0].squeeze()
+        # if data_test.max() > 1.3 and data_test.max() < 1.32 and data_test.min() > 0.24 and data_test.min() < 0.26:
+        #     print(f" i value {i} has max value {data_test.max()} and min value {data_test.min()}")
+   
+    #plot_heatmap(data_a1, data_a1, channel_plot=0, t_min=0., t_max=2., x_min=0., x_max=1., model_name="PINN_TEST_0.5_1.0")
+    # sys.exit() 
     """ 
     
     Best model at step 14500:
     train loss: 4.35e-04
     test loss: 4.35e-04
     test metric: []`
-    Original data 
-    Data range: 0.0002599694998934865 to 0.999688446521759
-    
-    PINN_ESSAY_539
-    Data range: 0.0002548264747019857 to 0.9998362064361572
-    
     """
     #sys.exit()
     # print(f"Data reshaped for plotting: {data_a1.shape}, type: {type(plot_data)}")
@@ -490,17 +468,27 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
 
     # filename
     if if_single_run:
-        model_name = flnm + "_PINN"
+        model_name = flnm.replace(".hdf5", "") + "_PINN"
     else:
         model_name = flnm[:-5] + "_PINN"
+        
+    print(f"model_name: {model_name}, flnm: {flnm}")
+    #sys.exit()
 
     checker = dde.callbacks.ModelCheckpoint(
-        f"{model_name}.pt", save_better_only=True, period=5000
+        f"{model_name}", save_better_only=True, period=5000
     )
+
+    class PrintSavedModelCallback(dde.callbacks.Callback):
+        def on_epoch_end(self):
+            if self.model.train_state.step % 5000 == 0:
+                print(f"Model checkpoint created at step {self.model.train_state.step}")
+                print(f"Expected filename: {model_name}-{self.model.train_state.step}.pt")
+                print(f"Files in directory: {[f for f in os.listdir('.') if model_name in f]}")
 
     model.compile("adam", lr=learning_rate)
     losshistory, train_state = model.train(
-        epochs=epochs, display_every=model_update, callbacks=[checker]
+        epochs=epochs, display_every=model_update, callbacks=[checker, PrintSavedModelCallback()]
     )
 
     test_input, test_gt = dataset.get_test_data(
@@ -519,7 +507,7 @@ def _run_training(scenario, epochs, learning_rate, model_update, flnm,
     )
 
     # Add heatmap plots for prediction vs ground truth
-    if scenario == "pde1D" and flnm.split('_')[1][0] == 'B' or scenario == "pde1D" and flnm.split('_')[0][0] == 'R':   # Burgers equation or ReactionDiffusion equation, "ReacDiff_Nu0.5_Rho1.0.hdf5"
+    if scenario == "pde1D" and flnm.split('_')[1][0] == 'B':  # Burgers equation
         try:
             # test_pred and test_gt have shape [1, n_x, n_t, n_components] from unravel_tensor
             # We need [n_x, n_t, n_components] for plot_heatmap
@@ -669,7 +657,10 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
                  input_ch=1, output_ch=1,
                  root_path='../data/', val_num=10, if_periodic_bc=True, aux_params=[None], 
                  time_size=None, spatial_size=None, seed='0000'):
+    print("val num and scenario")
     print(val_num, scenario)
+
+    
     pde_type = "ReactionDiffusion" 
     if pde_type == "Burgers":
         root_path =  "../PDEBench/pdebench/data_download/pdebench/data/1D/Burgers/Train/"
@@ -680,9 +671,12 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
         
     else:
         raise ValueError(f"Invalid PDE type: {pde_type}")
+    #print(f"flnm: {flnm}")
     #sys.exit()
 
     if val_num == 1:  # single job
+        print("==================single job============================")
+        epochs = 6000 # 15000
         _run_training(scenario, epochs, learning_rate, model_update, flnm,
                       input_ch, output_ch,
                       root_path, -val_num, if_periodic_bc, aux_params,
@@ -716,11 +710,15 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
                 pass
         
         # Load the latest model
-        model_path = f"{flnm[:-5]}_PINN.pt" if "." in flnm else f"{flnm}_PINN.pt"
+        #model_path = f"{flnm[:-5]}_PINN.pt" if "." in flnm else f"{flnm}_PINN.pt"
+        model_path = "" #"ReacDiff_Nu0.5_Rho1.0_PINN-5000.pt"
         print(f"model_path: {model_path}")
+        model = dde.Model.from_checkpoint(model_path)
+        print(model)
+        sys.exit()
         if os.path.exists(model_path):
-            model = dde.Model.from_checkpoint(model_path)
-            print(f"model: {model}")
+            #model = dde.Model.from_checkpoint(model_path)
+            model = model.restore(model_path, verbose=1)
             print(f"Generating standardized plots for {model_path}...")
             plot_paths = generate_pinn_plots_from_loaded_model(model, flnm)
             print(f"Plots saved to: {plot_paths['prediction']}")
@@ -759,6 +757,30 @@ def run_training(scenario, epochs, learning_rate, model_update, flnm,
                         model_name=f"{flnm[:-5]}_PINN_heatmap"
                     )
                     print(f"Heatmap plots saved with prefix: {flnm[:-5]}_PINN_heatmap")
+                elif "ReacDiff" in flnm:
+                    x_min, x_max = 0.0, 1.0
+                    t_min, t_max = 0.0, 2.0 
+                    
+                    x_points = np.linspace(x_min, x_max, 256)
+                    t_points = np.linspace(t_min, t_max, 21)
+                    
+                    X, T = np.meshgrid(x_points, t_points)
+                    input_points = np.vstack((X.flatten(), T.flatten())).T 
+                    
+                    # make predicition 
+                    pred = model.predict(input_points)[:,0]
+                    pred_reshaped = pred.reshape(T.shape)
+                    pred_heatmap = pred_reshaped.T[:,:,None]
+                    
+                    plot_heatmap(
+                        pred_heatmap, pred_heatmap,
+                        channel_plot=0,
+                        t_min=t_min, t_max=t_max,
+                        x_min=x_min, x_max=x_max,
+                        model_name=f"{flnm[:-5]}_PINN_heatmap"
+                    )
+                else:
+                    raise ValueError(f"Invalid model name: {flnm}")
             except Exception as e:
                 print(f"Warning: Could not generate custom heatmap plots: {str(e)}")
         else:
